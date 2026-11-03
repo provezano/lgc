@@ -153,15 +153,3 @@ def predict(scores: Array) -> Array:
     if values.ndim != 2 or values.shape[1] == 0:
         raise ValueError("scores must be a non-empty two-dimensional array")
     return np.argmax(values, axis=1)
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    from sklearn.datasets import make_moons
-
-    X, y = make_moons(n_samples=500, noise=0.1, random_state=0)
-    labels = np.full(len(y), -1, dtype=int)
-    labels[:10] = y[:10]
-    scores = lgc(X, labels, sigma=0.2)
-    plt.scatter(X[:, 0], X[:, 1], c=predict(scores), cmap="coolwarm")
-    plt.show()
