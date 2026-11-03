@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from lgc import build_affinity, lgc, normalize_affinity, predict, propagate
+from sklearn.base import clone
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+from lgc import LGCClassifier, build_affinity, lgc, normalize_affinity, predict, propagate
 
 
 def test_gaussian_affinity_uses_squared_distance_and_zero_diagonal():
@@ -52,3 +56,23 @@ def test_propagation_stops_before_iteration_limit():
 def test_invalid_parameters_are_rejected(kwargs, message):
     with pytest.raises(ValueError, match=message):
         lgc(np.array([[0.0], [1.0]]), np.array([0, -1]), **kwargs)
+
+
+def test_sklearn_classifier_supports_unlabeled_rows_and_probabilities():
+    X = np.array([[0.0], [0.1], [10.0], [10.1]])
+    y = np.array(["left", -1, "right", -1], dtype=object)
+    estimator = LGCClassifier(sigma=1.0, alpha=0.9, tol=1e-10).fit(X, y)
+
+    np.testing.assert_array_equal(estimator.predict(X), ["left", "left", "right", "right"])
+    probabilities = estimator.predict_proba(np.array([[0.05], [10.05]]))
+    np.testing.assert_allclose(probabilities.sum(axis=1), 1.0)
+
+
+def test_sklearn_classifier_works_in_pipeline_and_clone():
+    X = np.array([[0.0], [0.1], [10.0], [10.1]])
+    y = np.array([0, -1, 1, -1])
+    pipeline = make_pipeline(StandardScaler(), LGCClassifier(sigma=1.0))
+    fitted = pipeline.fit(X, y)
+    assert fitted.score(X[[0, 2]], y[[0, 2]]) == 1.0
+    cloned = clone(LGCClassifier(sigma=0.5, max_iter=10))
+    assert cloned.get_params()["sigma"] == 0.5

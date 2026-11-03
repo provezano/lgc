@@ -48,6 +48,24 @@ classes = predict(scores)
 accepts a one-hot label-confidence matrix, where unlabeled rows contain only
 zeros.
 
+## scikit-learn
+
+Use `LGCClassifier` with `Pipeline`, `clone`, cross-validation helpers, and
+the usual classifier methods:
+
+```python
+from lgc import LGCClassifier
+
+model = LGCClassifier(sigma=0.2, alpha=0.99)
+model.fit(X, y)                 # use -1 in y for unlabeled rows
+labels = model.predict(X_test)
+probabilities = model.predict_proba(X_test)
+```
+
+The estimator stores the training graph and applies the fitted class scores
+to new samples through their affinities to that graph. `-1` is reserved as
+the unlabeled marker, so it cannot be used as a class label.
+
 ## API
 
 - `build_affinity(X, sigma)` builds a Gaussian affinity matrix.
