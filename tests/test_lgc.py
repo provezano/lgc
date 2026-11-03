@@ -5,7 +5,17 @@ from sklearn.base import clone
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from lgc import LGCClassifier, build_affinity, lgc, normalize_affinity, predict, propagate
+from scipy import sparse
+
+from lgc import (
+    LGCClassifier,
+    build_affinity,
+    build_knn_affinity,
+    lgc,
+    normalize_affinity,
+    predict,
+    propagate,
+)
 
 
 def test_gaussian_affinity_uses_squared_distance_and_zero_diagonal():
@@ -21,6 +31,20 @@ def test_normalization_handles_isolated_samples():
     assert np.isfinite(normalized).all()
     assert normalized[2].sum() == 0.0
     np.testing.assert_allclose(normalized[:2, :2], [[0.0, 1.0], [1.0, 0.0]])
+
+
+def test_knn_affinity_is_sparse_and_symmetric():
+    X = np.arange(30, dtype=float).reshape(-1, 1)
+    affinity = build_knn_affinity(X, sigma=1.0, n_neighbors=2)
+    assert sparse.isspmatrix_csr(affinity)
+    assert affinity.nnz <= len(X) * 4
+    np.testing.assert_allclose(affinity.toarray(), affinity.T.toarray())
+
+
+def test_lgc_knn_mode_preserves_cluster_predictions():
+    X = np.array([[0.0], [0.1], [10.0], [10.1]])
+    scores = lgc(X, np.array([0, -1, 1, -1]), sigma=1.0, n_neighbors=1)
+    np.testing.assert_array_equal(predict(scores), [0, 0, 1, 1])
 
 
 def test_lgc_accepts_integer_labels_and_predicts_two_clusters():
@@ -76,3 +100,10 @@ def test_sklearn_classifier_works_in_pipeline_and_clone():
     assert fitted.score(X[[0, 2]], y[[0, 2]]) == 1.0
     cloned = clone(LGCClassifier(sigma=0.5, max_iter=10))
     assert cloned.get_params()["sigma"] == 0.5
+
+
+def test_sklearn_classifier_knn_mode_predicts_new_samples():
+    X = np.array([[0.0], [0.1], [10.0], [10.1]])
+    y = np.array([0, -1, 1, -1])
+    estimator = LGCClassifier(sigma=1.0, n_neighbors=1).fit(X, y)
+    np.testing.assert_array_equal(estimator.predict([[0.05], [10.05]]), [0, 1])

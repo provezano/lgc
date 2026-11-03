@@ -2,6 +2,7 @@
 
 from .core import (
     build_affinity,
+    build_knn_affinity,
     lgc,
     normalize_affinity,
     predict,
@@ -11,6 +12,7 @@ from .sklearn import LGCClassifier
 
 __all__ = [
     "build_affinity",
+    "build_knn_affinity",
     "lgc",
     "normalize_affinity",
     "predict",

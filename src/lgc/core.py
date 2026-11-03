@@ -13,9 +13,17 @@ from __future__ import annotations
 from typing import Final
 
 import numpy as np
+from scipy import sparse
 from scipy.spatial.distance import cdist
+from sklearn.neighbors import NearestNeighbors
 
 Array: Final = np.ndarray
+
+
+def _validate_sigma(sigma: float) -> float:
+    if not np.isfinite(sigma) or sigma <= 0:
+        raise ValueError("sigma must be a positive finite number")
+    return float(sigma)
 
 
 def build_affinity(
@@ -37,8 +45,7 @@ def build_affinity(
         raise ValueError("X must contain at least one sample")
     if not np.isfinite(samples).all():
         raise ValueError("X must contain only finite values")
-    if not np.isfinite(sigma) or sigma <= 0:
-        raise ValueError("sigma must be a positive finite number")
+    sigma = _validate_sigma(sigma)
 
     squared_distances = cdist(samples, samples, metric="sqeuclidean")
     affinity = np.exp(-squared_distances / (2.0 * sigma**2))
@@ -47,8 +54,60 @@ def build_affinity(
     return affinity
 
 
+def build_knn_affinity(
+    X: Array,
+    sigma: float = 0.1,
+    n_neighbors: int = 15,
+) -> sparse.csr_matrix:
+    """Build a symmetric sparse Gaussian affinity graph.
+
+    Only the ``n_neighbors`` closest samples per row are retained, reducing
+    storage from ``O(n²)`` to ``O(n * n_neighbors)``. Reciprocal edges are
+    combined with their maximum weight so the LGC graph remains symmetric.
+    """
+    samples = np.asarray(X, dtype=float)
+    if samples.ndim != 2:
+        raise ValueError("X must be a two-dimensional array")
+    if samples.shape[0] == 0:
+        raise ValueError("X must contain at least one sample")
+    if not np.isfinite(samples).all():
+        raise ValueError("X must contain only finite values")
+    if not isinstance(n_neighbors, (int, np.integer)) or n_neighbors <= 0:
+        raise ValueError("n_neighbors must be a positive integer")
+    sigma = _validate_sigma(sigma)
+
+    n_samples = len(samples)
+    count = min(int(n_neighbors) + 1, n_samples)
+    model = NearestNeighbors(n_neighbors=count, algorithm="auto")
+    distances, indices = model.fit(samples).kneighbors(samples)
+    distances = distances[:, 1:]
+    indices = indices[:, 1:]
+    rows = np.repeat(np.arange(n_samples), indices.shape[1])
+    weights = np.exp(-(distances**2) / (2.0 * sigma**2)).ravel()
+    graph = sparse.csr_matrix(
+        (weights, (rows, indices.ravel())),
+        shape=(n_samples, n_samples),
+    )
+    return graph.maximum(graph.T).tocsr()
+
+
 def normalize_affinity(affinity: Array) -> Array:
     """Return ``D^-1/2 W D^-1/2`` with safe handling of isolated samples."""
+    matrix = affinity
+    if sparse.issparse(matrix):
+        matrix = matrix.tocsr()
+        if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+            raise ValueError("affinity must be a square matrix")
+        if matrix.nnz and (not np.isfinite(matrix.data).all() or np.any(matrix.data < 0)):
+            raise ValueError("affinity must contain finite, non-negative values")
+        degree = np.asarray(matrix.sum(axis=1)).ravel()
+        inverse_sqrt_degree = np.zeros_like(degree)
+        nonzero = degree > 0
+        inverse_sqrt_degree[nonzero] = 1.0 / np.sqrt(degree[nonzero])
+        return matrix.multiply(inverse_sqrt_degree[:, None]).multiply(
+            inverse_sqrt_degree[None, :]
+        ).tocsr()
+
     matrix = np.asarray(affinity, dtype=float)
     if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
         raise ValueError("affinity must be a square matrix")
@@ -100,7 +159,9 @@ def propagate(
     tol: float = 1e-6,
 ) -> tuple[Array, int]:
     """Propagate labels until convergence and return scores and iterations."""
-    S = np.asarray(normalized_affinity, dtype=float)
+    S = normalized_affinity.tocsr() if sparse.issparse(normalized_affinity) else np.asarray(
+        normalized_affinity, dtype=float
+    )
     Y = np.asarray(label_matrix, dtype=float)
     if S.ndim != 2 or S.shape[0] != S.shape[1]:
         raise ValueError("normalized_affinity must be square")
@@ -131,11 +192,16 @@ def lgc(
     alpha: float = 0.99,
     max_iter: int = 400,
     tol: float = 1e-6,
+    n_neighbors: int | None = None,
 ) -> Array:
     """Run LGC and return one class-confidence row per sample."""
     samples = np.asarray(X, dtype=float)
     Y = _label_matrix(labels, len(samples))
-    affinity = build_affinity(samples, sigma)
+    affinity = (
+        build_affinity(samples, sigma)
+        if n_neighbors is None
+        else build_knn_affinity(samples, sigma, n_neighbors)
+    )
     normalized = normalize_affinity(affinity)
     scores, _ = propagate(
         normalized,
