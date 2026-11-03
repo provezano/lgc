@@ -7,6 +7,7 @@ from .core import (
     predict,
     propagate,
 )
+from .sklearn import LGCClassifier
 
 __all__ = [
     "build_affinity",
@@ -14,4 +15,5 @@ __all__ = [
     "normalize_affinity",
     "predict",
     "propagate",
+    "LGCClassifier",
 ]
