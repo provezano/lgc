@@ -4,13 +4,29 @@ An efficient, tested implementation of the LGC semi-supervised learning
 algorithm from Zhou et al., *Learning with Local and Global Consistency*
 (NeurIPS 2004).
 
-## Installation
+## Install
+
+Runtime dependencies:
 
 ```bash
-python3 -m pip install -r requirements.txt
+python3 -m pip install .
 ```
 
-## Usage
+For development and tests:
+
+```bash
+python3 -m pip install -e '.[dev]'
+pytest
+```
+
+For the optional visualization demo:
+
+```bash
+python3 -m pip install -e '.[demo]'
+python3 -m lgc.demo
+```
+
+## Quick start
 
 Use integer class labels and mark unlabeled samples with `-1`:
 
@@ -28,23 +44,26 @@ scores = lgc(
 classes = predict(scores)
 ```
 
-The implementation also accepts a one-hot label-confidence matrix, where
-unlabeled rows contain only zeros.
+`lgc()` returns one confidence score per class and sample. The function also
+accepts a one-hot label-confidence matrix, where unlabeled rows contain only
+zeros.
 
-## Improvements over the original demo
+## API
 
-- Correct Gaussian affinity kernel using squared Euclidean distance.
-- Vectorized kernel computation instead of `np.vectorize` and Python callbacks.
-- Safe normalization for isolated samples.
-- Early stopping based on the maximum score change.
-- Reusable functions with input validation and deterministic tests.
-- Plotting and the optional `scikit-learn` demo are loaded only when running
-  `python lgc.py`; importing the algorithm does not require Matplotlib.
+- `build_affinity(X, sigma)` builds a Gaussian affinity matrix.
+- `normalize_affinity(W)` computes `D^-1/2 W D^-1/2`.
+- `propagate(S, Y, alpha, max_iter, tol)` runs label propagation.
+- `lgc(X, labels, ...)` runs the complete pipeline.
+- `predict(scores)` converts scores to class ids.
 
-## Tests
+## Design notes
 
-```bash
-pytest -q
-```
+- The Gaussian kernel uses squared Euclidean distance.
+- Affinity construction is vectorized through SciPy/NumPy; no Python callback
+  runs once per pair of samples.
+- Isolated samples are handled without division by zero.
+- Propagation stops early when scores converge.
+- The dense affinity matrix is `O(n²)` in memory. For very large datasets,
+  use a sparse k-nearest-neighbor graph rather than increasing this matrix.
 
 The original exploratory notebook is retained as `lgc.ipynb`.
