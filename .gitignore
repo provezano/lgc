@@ -1,5 +1,8 @@
+*.egg-info/
+*.py[cod]
 .DS_Store
 .ipynb_checkpoints/
-__pycache__/
 .pytest_cache/
-*.py[cod]
+__pycache__/
+build/
+dist/
