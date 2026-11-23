@@ -102,3 +102,7 @@ the unlabeled marker, so it cannot be used as a class label.
   `O(n * n_neighbors)` stored edges and sparse matrix multiplication.
 - The k-NN graph is symmetrized by taking the maximum of reciprocal edge
   weights.
+
+## Licence
+
+Apache-2.0, see `LICENSE`. Copyright Felipe Provezano Coutinho.
