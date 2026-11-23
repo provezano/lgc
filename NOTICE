@@ -7,6 +7,7 @@ ORCID: https://orcid.org/0000-0001-7206-5856
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 The algorithm implemented here is due to Zhou, Bousquet, Lal, Weston and
-Scholkopf, "Learning with Local and Global Consistency", NeurIPS 2004; please
-cite that paper for the method. If you use this implementation, please also
+Scholkopf, "Learning with Local and Global Consistency", Advances in Neural
+Information Processing Systems 16, pages 321-328, 2004; please cite that paper
+for the method. If you use this implementation, please also
 cite this software: https://github.com/provezano/lgc
